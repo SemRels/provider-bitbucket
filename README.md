@@ -1,41 +1,24 @@
-# {{PLUGIN_NAME}}
+# provider-bitbucket
 
-> Replace this description with what your SemRel plugin does.
+`provider-bitbucket` is a SemRel release provider that creates Bitbucket tags and uploads release notes to the repository downloads area.
 
-This repository is based on the `SemRels/plugin-template` GitHub template and provides a clean starting point for provider, analyzer, generator, updater, or hook plugins.
+## Configuration
 
-## Repository Layout
+Environment variables:
 
-```text
-cmd/plugin/              Plugin entry point
-internal/plugin/         Business logic scaffold
-internal/grpc/           gRPC transport scaffold
-proto/v1                 Symlink to the SemRel protobuf contract
-.github/workflows/       CI, release, and security automation
-```
+- `BITBUCKET_WORKSPACE`
+- `BITBUCKET_REPO_SLUG`
+- `BITBUCKET_TOKEN`
 
-## Installation
+## Behavior
 
-Published binaries are distributed through releases and synchronized to `registry.semrel.io`.
+- Creates a tag through Bitbucket REST API v2
+- Uploads release notes as a text asset through the downloads endpoint
 
 ## Development
 
 ```bash
-go build ./cmd/plugin
+go mod tidy
+go build ./...
 go test ./...
 ```
-
-## Configuration
-
-See the SemRel documentation for plugin configuration and runtime integration details:
-
-- https://github.com/SemRels/semrel
-- https://registry.semrel.io
-
-## Next Steps
-
-1. Replace all `{{...}}` placeholders.
-2. Rename the module path in `go.mod`.
-3. Implement your plugin logic in `internal/plugin/`.
-4. Wire generated protobuf bindings into `internal/grpc/`.
-5. Create your first tagged release with `v*.*.*`.

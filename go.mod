@@ -1,4 +1,4 @@
-module github.com/SemRels/plugin-template
+module github.com/SemRels/provider-bitbucket
 
 go 1.24
 
