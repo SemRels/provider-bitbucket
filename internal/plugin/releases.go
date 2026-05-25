@@ -39,18 +39,54 @@ type Client struct {
 
 // Config configures the Bitbucket client.
 type Config struct {
-	// BaseURL overrides the Bitbucket API base URL (for testing).
-	BaseURL string
-	// Workspace is the Bitbucket workspace (organisation or user slug).
-	Workspace string
-	// RepoSlug is the repository slug.
-	RepoSlug string
-	// Username is the Bitbucket username for Basic Auth.
-	Username string
-	// AppPassword is the Bitbucket app password for Basic Auth.
+	BaseURL     string
+	Workspace   string
+	RepoSlug    string
+	Username    string
 	AppPassword string
-	// Timeout for HTTP requests (defaults to 30s).
-	Timeout time.Duration
+	Timeout     time.Duration
+}
+
+func ConfigFromEnv() Config {
+	workspace := strings.TrimSpace(os.Getenv("SEMREL_PLUGIN_WORKSPACE"))
+	if workspace == "" {
+		workspace = strings.TrimSpace(os.Getenv("BITBUCKET_WORKSPACE"))
+	}
+
+	repo := strings.TrimSpace(os.Getenv("SEMREL_PLUGIN_REPO"))
+	if repo == "" {
+		repo = strings.TrimSpace(os.Getenv("BITBUCKET_REPO_SLUG"))
+	}
+	if workspace == "" || repo == "" {
+		fullName := strings.TrimSpace(os.Getenv("BITBUCKET_REPO_FULL_NAME"))
+		parts := strings.SplitN(fullName, "/", 2)
+		if len(parts) == 2 {
+			if workspace == "" {
+				workspace = parts[0]
+			}
+			if repo == "" {
+				repo = parts[1]
+			}
+		}
+	}
+
+	username := strings.TrimSpace(os.Getenv("SEMREL_PLUGIN_USERNAME"))
+	if username == "" {
+		username = strings.TrimSpace(os.Getenv("BITBUCKET_USERNAME"))
+	}
+
+	appPassword := strings.TrimSpace(os.Getenv("SEMREL_PLUGIN_APP_PASSWORD"))
+	if appPassword == "" {
+		appPassword = strings.TrimSpace(os.Getenv("BITBUCKET_APP_PASSWORD"))
+	}
+
+	return Config{
+		BaseURL:     coalesce(strings.TrimSpace(os.Getenv("SEMREL_PLUGIN_BASE_URL")), defaultBaseURL),
+		Workspace:   workspace,
+		RepoSlug:    repo,
+		Username:    username,
+		AppPassword: appPassword,
+	}
 }
 
 // NewClient creates a new Bitbucket API client.
@@ -73,6 +109,10 @@ func NewClient(cfg Config) *Client {
 	}
 }
 
+func New(cfg Config) *Client {
+	return NewClient(cfg)
+}
+
 // Tag represents a Bitbucket repository tag.
 type Tag struct {
 	Name   string `json:"name"`
@@ -84,7 +124,7 @@ type Tag struct {
 
 // CreateTag creates an annotated tag in the Bitbucket repository.
 func (c *Client) CreateTag(ctx context.Context, name, commitHash, message string) (*Tag, error) {
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"name":    name,
 		"target":  map[string]string{"hash": commitHash},
 		"message": message,
@@ -121,10 +161,24 @@ func (c *Client) CreateTag(ctx context.Context, name, commitHash, message string
 
 // Download represents a Bitbucket repository download entry.
 type Download struct {
-	Name string `json:"name"`
-	Size int64  `json:"size"`
-	// Links contains download links.
+	Name  string                       `json:"name"`
+	Size  int64                        `json:"size"`
 	Links map[string]map[string]string `json:"links,omitempty"`
+}
+
+func (c *Client) CreateRelease(ctx context.Context, tagName, changelog string) (*Download, error) {
+	fileName := strings.TrimSpace(os.Getenv("SEMREL_PLUGIN_NOTES_FILENAME"))
+	if fileName == "" {
+		fileName = strings.TrimSpace(tagName) + ".md"
+	}
+	if strings.TrimSpace(fileName) == "" {
+		return nil, fmt.Errorf("bitbucket: tag name is required")
+	}
+	content := changelog
+	if content == "" {
+		content = tagName
+	}
+	return c.uploadDownloadContent(ctx, fileName, []byte(content))
 }
 
 // UploadDownload uploads a file to the Bitbucket repository downloads.
@@ -133,18 +187,28 @@ func (c *Client) UploadDownload(ctx context.Context, filePath string) (*Download
 	if err != nil {
 		return nil, fmt.Errorf("bitbucket: open file: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
+	return c.uploadMultipart(ctx, filepath.Base(filePath), f)
+}
+
+func (c *Client) uploadDownloadContent(ctx context.Context, name string, content []byte) (*Download, error) {
+	return c.uploadMultipart(ctx, name, bytes.NewReader(content))
+}
+
+func (c *Client) uploadMultipart(ctx context.Context, name string, content io.Reader) (*Download, error) {
 	var buf bytes.Buffer
 	mw := multipart.NewWriter(&buf)
-	fw, err := mw.CreateFormFile("files", filepath.Base(filePath))
+	fw, err := mw.CreateFormFile("files", name)
 	if err != nil {
 		return nil, fmt.Errorf("bitbucket: create form file: %w", err)
 	}
-	if _, err := io.Copy(fw, f); err != nil {
+	if _, err := io.Copy(fw, content); err != nil {
 		return nil, fmt.Errorf("bitbucket: copy file: %w", err)
 	}
-	mw.Close()
+	if err := mw.Close(); err != nil {
+		return nil, fmt.Errorf("bitbucket: close multipart writer: %w", err)
+	}
 
 	url := fmt.Sprintf("%s/repositories/%s/%s/downloads", c.baseURL, c.workspace, c.repoSlug)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, &buf)
@@ -164,8 +228,7 @@ func (c *Client) UploadDownload(ctx context.Context, filePath string) (*Download
 		return nil, c.apiError("upload download", resp)
 	}
 
-	// 200 = replaced, 201 = created; Bitbucket returns empty body on success
-	return &Download{Name: filepath.Base(filePath)}, nil
+	return &Download{Name: name}, nil
 }
 
 // ListDownloads lists downloads for the repository.
@@ -240,4 +303,11 @@ func (c *Client) setAuth(req *http.Request) {
 func (c *Client) apiError(op string, resp *http.Response) error {
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
 	return fmt.Errorf("bitbucket: %s: status %d: %s", op, resp.StatusCode, strings.TrimSpace(string(body)))
+}
+
+func coalesce(a, b string) string {
+	if a != "" {
+		return a
+	}
+	return b
 }
