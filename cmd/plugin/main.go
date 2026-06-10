@@ -15,7 +15,7 @@ import (
 const pluginSchemaVersion = 1
 
 func main() {
-	fmt.Fprintf(os.Stderr, "plugin_schema_version=%d\n", pluginSchemaVersion)
+	_, _ = fmt.Fprintf(os.Stderr, "plugin_schema_version=%d\n", pluginSchemaVersion)
 	os.Exit(run())
 }
 
