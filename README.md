@@ -6,9 +6,28 @@ This plugin is distributed as the standalone Go binary `semrel-plugin-provider-b
 
 ## Installation
 
+### Binary
+
 ```bash
 go install github.com/SemRels/provider-bitbucket/cmd/plugin@latest
 ```
+
+### Docker
+
+Pre-built, multi-platform images (linux/amd64, linux/arm64) are published to the GitHub Container Registry on every release:
+
+```bash
+docker pull ghcr.io/semrels/provider-bitbucket:latest
+```
+
+Images are signed with [cosign](https://github.com/sigstore/cosign) and include a full SBOM attestation. Verify the signature:
+
+```bash
+cosign verify ghcr.io/semrels/provider-bitbucket:latest \
+  --certificate-identity-regexp 'https://github.com/SemRels/provider-bitbucket/.github/workflows/release.yml.*' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
 
 ## Configuration
 
