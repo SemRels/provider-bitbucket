@@ -1,6 +1,6 @@
 # provider-bitbucket
 
-[![Latest Release](https://img.shields.io/github/v/release/SemRels/provider-bitbucket?label=version\&color=blue)](https://github.com/SemRels/provider-bitbucket/releases/latest)
+[![Latest Release](https://img.shields.io/github/v/release/SemRels/provider-bitbucket?label=version&color=blue)](https://github.com/SemRels/provider-bitbucket/releases/latest)
 
 Publishes the semrel release to Bitbucket.
 
