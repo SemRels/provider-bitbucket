@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://registry.semrel.io/schemas/plugins/provider-bitbucket/v1.json",
+  "$id": "https://registry.semrel.io/schemas/plugins/bitbucket/v1.json",
   "title": "provider-bitbucket plugin configuration",
   "description": "Schema v1 for the provider-bitbucket semrel plugin. Configure via SEMREL_* environment variables.",
   "type": "object",
