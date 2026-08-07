@@ -146,17 +146,19 @@ func (c *Client) CreateTag(ctx context.Context, name, commitHash, message string
 	if err != nil {
 		return nil, fmt.Errorf("bitbucket: create tag: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode >= 300 {
 		return nil, c.apiError("create tag", resp)
 	}
 
-	var tag Tag
-	if err := json.NewDecoder(resp.Body).Decode(&tag); err != nil {
+	var responseTag Tag
+	if err := json.NewDecoder(resp.Body).Decode(&responseTag); err != nil {
 		return nil, fmt.Errorf("bitbucket: decode tag response: %w", err)
 	}
-	return &tag, nil
+	return &responseTag, nil
 }
 
 // Download represents a Bitbucket repository download entry.
@@ -222,7 +224,9 @@ func (c *Client) uploadMultipart(ctx context.Context, name string, content io.Re
 	if err != nil {
 		return nil, fmt.Errorf("bitbucket: upload download: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode >= 300 {
 		return nil, c.apiError("upload download", resp)
@@ -244,7 +248,9 @@ func (c *Client) ListDownloads(ctx context.Context) ([]Download, error) {
 	if err != nil {
 		return nil, fmt.Errorf("bitbucket: list downloads: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode >= 300 {
 		return nil, c.apiError("list downloads", resp)
@@ -286,7 +292,9 @@ func (c *Client) SetPipelineVariable(ctx context.Context, key, value string, sec
 	if err != nil {
 		return fmt.Errorf("bitbucket: set variable: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode >= 300 {
 		return c.apiError("set pipeline variable", resp)
