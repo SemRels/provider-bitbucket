@@ -243,7 +243,9 @@ func parseBool(raw string) (bool, error) {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
 	case "1", "true", "yes", "on":
 		return true, nil
-	case "", "0", "false", "no", "off":
+	case "":
+		return true, nil
+	case "0", "false", "no", "off":
 		return false, nil
 	default:
 		return false, fmt.Errorf("SEMREL_PLUGIN_COMMENT_ON_PRS must be a boolean")

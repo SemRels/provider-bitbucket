@@ -42,6 +42,25 @@ func TestConfigFromEnv(t *testing.T) {
 	if cfg.BaseURL != "https://example.test/api" || cfg.Workspace != "workspace" || cfg.RepoSlug != "repo" || cfg.Username != "user" || cfg.AppPassword != "pass" {
 		t.Fatalf("unexpected config: %#v", cfg)
 	}
+	if !cfg.CommentOnPRs {
+		t.Fatal("expected pull request comments to be enabled by default")
+	}
+}
+
+func TestConfigFromEnvCanDisablePullRequestComments(t *testing.T) {
+	t.Setenv("SEMREL_PLUGIN_WORKSPACE", "workspace")
+	t.Setenv("SEMREL_PLUGIN_REPO", "repo")
+	t.Setenv("SEMREL_PLUGIN_USERNAME", "user")
+	t.Setenv("SEMREL_PLUGIN_APP_PASSWORD", "pass")
+	t.Setenv("SEMREL_PLUGIN_COMMENT_ON_PRS", "false")
+
+	cfg := bitbucket.ConfigFromEnv()
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Config.Validate() error: %v", err)
+	}
+	if cfg.CommentOnPRs {
+		t.Fatal("expected pull request comments to be disabled")
+	}
 }
 
 func TestCommentOnPullRequestsPostsOneCommentPerPR(t *testing.T) {
