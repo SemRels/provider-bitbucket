@@ -42,6 +42,7 @@ plugins:
       SEMREL_PLUGIN_REPO: "service-api"
       SEMREL_PLUGIN_APP_PASSWORD: "${BITBUCKET_APP_PASSWORD}"
       SEMREL_PLUGIN_USERNAME: "semrel-bot"
+      SEMREL_PLUGIN_COMMENT_ON_PRS: "true"
 ```
 
 ## `SEMREL_PLUGIN_*` variables
@@ -52,6 +53,7 @@ plugins:
 | `SEMREL_PLUGIN_REPO` | Optional | Bitbucket repository slug. Defaults from the git remote when available. | Derived from git remote |
 | `SEMREL_PLUGIN_APP_PASSWORD` | Required | Bitbucket app password. | None |
 | `SEMREL_PLUGIN_USERNAME` | Required | Bitbucket username. | None |
+| `SEMREL_PLUGIN_COMMENT_ON_PRS` | Optional | Comment on pull requests associated with commits in the release. Defaults to true; set to `false` to disable. The app password needs repository and pull request write permissions. | true |
 
 ## `SEMREL_*` release context used
 
@@ -63,7 +65,7 @@ plugins:
 
 ## Example behavior
 
-The plugin creates or updates a Bitbucket release for the current tag and publishes the changelog text as the release notes.
+The plugin creates or updates a Bitbucket release for the current tag and publishes the changelog text as the release notes. By default it posts an idempotent link comment to associated pull requests. Set `SEMREL_PLUGIN_COMMENT_ON_PRS` to `false` to disable comments.
 
 ## License
 
