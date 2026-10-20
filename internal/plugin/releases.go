@@ -88,6 +88,12 @@ func ConfigFromEnv() Config {
 	if appPassword == "" {
 		appPassword = strings.TrimSpace(os.Getenv("BITBUCKET_APP_PASSWORD"))
 	}
+	if appPassword == "" {
+		appPassword = strings.TrimSpace(os.Getenv("SEMREL_PLUGIN_TOKEN"))
+	}
+	if appPassword == "" {
+		appPassword = strings.TrimSpace(os.Getenv("BITBUCKET_TOKEN"))
+	}
 
 	cfg := Config{
 		BaseURL:          coalesce(strings.TrimSpace(os.Getenv("SEMREL_PLUGIN_BASE_URL")), defaultBaseURL),
