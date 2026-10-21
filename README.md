@@ -1,6 +1,10 @@
 # provider-bitbucket
 
 [![Latest Release](https://img.shields.io/github/v/release/SemRels/provider-bitbucket?label=version&color=blue)](https://github.com/SemRels/provider-bitbucket/releases/latest)
+[![CI](https://github.com/SemRels/provider-bitbucket/actions/workflows/ci.yml/badge.svg)](https://github.com/SemRels/provider-bitbucket/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/SemRels/provider-bitbucket)](LICENSE)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/SemRels/provider-bitbucket/badge)](https://scorecard.dev/viewer/?uri=github.com/SemRels/provider-bitbucket)
+[![REUSE status](https://api.reuse.software/badge/github.com/SemRels/provider-bitbucket)](https://api.reuse.software/info/github.com/SemRels/provider-bitbucket)
 
 Publishes the semrel release to Bitbucket.
 
