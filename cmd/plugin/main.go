@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	plugin "github.com/SemRels/provider-bitbucket/internal/plugin"
@@ -26,7 +27,9 @@ func run() int {
 		fmt.Fprintln(os.Stderr, "provider-bitbucket:", err)
 		return 1
 	}
-	if cfg.Username == "" || cfg.AppPassword == "" {
+
+	dryRun := strings.EqualFold(strings.TrimSpace(os.Getenv("SEMREL_DRY_RUN")), "true")
+	if !dryRun && (cfg.Username == "" || cfg.AppPassword == "") {
 		fmt.Fprintln(os.Stderr, "provider-bitbucket: SEMREL_PLUGIN_USERNAME and SEMREL_PLUGIN_APP_PASSWORD are required")
 		return 1
 	}
@@ -35,13 +38,37 @@ func run() int {
 		return 1
 	}
 
-	tagName := os.Getenv("SEMREL_TAG_NAME")
+	tagName := strings.TrimSpace(os.Getenv("SEMREL_TAG_NAME"))
+	if tagName == "" {
+		tagName = strings.TrimSpace(os.Getenv("SEMREL_VERSION"))
+	}
+	if tagName == "" {
+		tagName = strings.TrimSpace(os.Getenv("SEMREL_NEXT_VERSION"))
+	}
 	if tagName == "" {
 		fmt.Fprintln(os.Stderr, "provider-bitbucket: SEMREL_TAG_NAME is required")
 		return 1
 	}
-	if os.Getenv("SEMREL_DRY_RUN") == "true" {
+
+	changelog := os.Getenv("SEMREL_CHANGELOG")
+	if dryRun {
+		if cfg.Username == "" || cfg.AppPassword == "" {
+			fmt.Fprintln(os.Stderr, "[dry-run] provider-bitbucket: would need BITBUCKET_TOKEN (or SEMREL_PLUGIN_USERNAME and SEMREL_PLUGIN_APP_PASSWORD) to create release")
+		}
+		fmt.Fprintf(os.Stderr, "[dry-run] provider-bitbucket: would create release %s for %s/%s\n", tagName, cfg.Workspace, cfg.RepoSlug)
+
+		notesFile := strings.TrimSpace(os.Getenv("SEMREL_PLUGIN_NOTES_FILENAME"))
+		if notesFile == "" {
+			notesFile = tagName + ".md"
+		}
 		fmt.Printf("provider-bitbucket: [dry-run] would create release %s\n", tagName)
+		fmt.Printf("tag: %s\n", tagName)
+		fmt.Printf("title: %s\n", tagName)
+		fmt.Printf("target: %s/repositories/%s/%s/downloads\n", strings.TrimRight(cfg.BaseURL, "/"), cfg.Workspace, cfg.RepoSlug)
+		fmt.Printf("assets: %s\n", notesFile)
+		if changelog != "" {
+			fmt.Printf("notes:\n%s\n", changelog)
+		}
 		return 0
 	}
 
@@ -49,7 +76,7 @@ func run() int {
 	defer cancel()
 
 	client := plugin.New(cfg)
-	if _, err := client.CreateRelease(ctx, tagName, os.Getenv("SEMREL_CHANGELOG")); err != nil {
+	if _, err := client.CreateRelease(ctx, tagName, changelog); err != nil {
 		fmt.Fprintln(os.Stderr, "provider-bitbucket:", err)
 		return 1
 	}
