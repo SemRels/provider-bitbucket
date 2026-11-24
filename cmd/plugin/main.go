@@ -28,7 +28,8 @@ func run() int {
 		return 1
 	}
 
-	dryRun := strings.EqualFold(strings.TrimSpace(os.Getenv("SEMREL_DRY_RUN")), "true")
+	dryRunValue := strings.TrimSpace(os.Getenv("SEMREL_DRY_RUN"))
+	dryRun := strings.EqualFold(dryRunValue, "true") || dryRunValue == "1"
 	if !dryRun && (cfg.Username == "" || cfg.AppPassword == "") {
 		fmt.Fprintln(os.Stderr, "provider-bitbucket: SEMREL_PLUGIN_USERNAME and SEMREL_PLUGIN_APP_PASSWORD are required")
 		return 1

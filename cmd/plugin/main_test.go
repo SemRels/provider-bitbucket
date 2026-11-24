@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -110,6 +111,30 @@ func TestRunDryRunWithoutCredentials(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "would create release v1.2.3") || !strings.Contains(stdout, "dry run notes") {
 		t.Fatalf("stdout = %q, want dry-run preview", stdout)
+	}
+}
+
+func TestNumericDryRunDoesNotCreateRelease(t *testing.T) {
+	var requests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requests.Add(1)
+		w.WriteHeader(http.StatusCreated)
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("SEMREL_PLUGIN_BASE_URL", server.URL)
+	t.Setenv("SEMREL_PLUGIN_USERNAME", "user")
+	t.Setenv("SEMREL_PLUGIN_APP_PASSWORD", "pass")
+	t.Setenv("SEMREL_PLUGIN_WORKSPACE", "workspace")
+	t.Setenv("SEMREL_PLUGIN_REPO", "repo")
+	t.Setenv("SEMREL_TAG_NAME", "v1.2.3")
+	t.Setenv("SEMREL_DRY_RUN", "1")
+
+	code, stdout, stderr := captureOutput(t, run)
+	if requests.Load() != 0 {
+		t.Fatalf("dry-run made %d HTTP requests", requests.Load())
+	}
+	if code != 0 || !strings.Contains(stdout, "[dry-run]") {
+		t.Fatalf("dry-run code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 }
 
