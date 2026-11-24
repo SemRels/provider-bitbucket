@@ -13,6 +13,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -401,8 +402,7 @@ func (c *Client) uploadMultipart(ctx context.Context, name string, content io.Re
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, reader)
 	if err != nil {
 		_ = reader.Close()
-		_ = <-writeDone
-		return nil, fmt.Errorf("bitbucket: upload download request: %w", err)
+		return nil, fmt.Errorf("bitbucket: upload download request: %w", errors.Join(err, <-writeDone))
 	}
 	req.Header.Set("Content-Type", mw.FormDataContentType())
 	c.setAuth(req)
@@ -410,8 +410,7 @@ func (c *Client) uploadMultipart(ctx context.Context, name string, content io.Re
 	resp, err := c.http.Do(req)
 	if err != nil {
 		_ = reader.Close()
-		_ = <-writeDone
-		return nil, fmt.Errorf("bitbucket: upload download: %w", err)
+		return nil, fmt.Errorf("bitbucket: upload download: %w", errors.Join(err, <-writeDone))
 	}
 	defer func() {
 		_ = resp.Body.Close()
