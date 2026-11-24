@@ -1,6 +1,6 @@
 # Code of Conduct
 
-provider-bitbucket is committed to providing a welcoming and harassment-free community.
+`provider-bitbucket` is committed to providing a welcoming and harassment-free community.
 
 ## Our Pledge
 

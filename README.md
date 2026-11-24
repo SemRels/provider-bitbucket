@@ -1,6 +1,10 @@
 # provider-bitbucket
 
 [![Latest Release](https://img.shields.io/github/v/release/SemRels/provider-bitbucket?label=version&color=blue)](https://github.com/SemRels/provider-bitbucket/releases/latest)
+[![CI](https://github.com/SemRels/provider-bitbucket/actions/workflows/ci.yml/badge.svg)](https://github.com/SemRels/provider-bitbucket/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/SemRels/provider-bitbucket)](LICENSE)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/SemRels/provider-bitbucket/badge)](https://scorecard.dev/viewer/?uri=github.com/SemRels/provider-bitbucket)
+[![REUSE status](https://api.reuse.software/badge/github.com/SemRels/provider-bitbucket)](https://api.reuse.software/info/github.com/SemRels/provider-bitbucket)
 
 Publishes the semrel release to Bitbucket.
 
@@ -26,7 +30,7 @@ Images are signed with [cosign](https://github.com/sigstore/cosign) and include 
 
 ```bash
 cosign verify ghcr.io/semrels/provider-bitbucket:latest \
-  --certificate-identity-regexp 'https://github.com/SemRels/provider-bitbucket/.github/workflows/release.yml.*' \
+  --certificate-identity-regexp 'https://github.com/SemRels/provider-bitbucket/.github/workflows/container.yml.*' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
@@ -35,25 +39,27 @@ cosign verify ghcr.io/semrels/provider-bitbucket:latest \
 
 ```yaml
 plugins:
-  - name: provider-bitbucket
-    path: ~/.semrel/plugins/semrel-plugin-provider-bitbucket
-    env:
-      SEMREL_PLUGIN_WORKSPACE: "acme"
-      SEMREL_PLUGIN_REPO: "service-api"
-      SEMREL_PLUGIN_APP_PASSWORD: "${BITBUCKET_APP_PASSWORD}"
-      SEMREL_PLUGIN_USERNAME: "semrel-bot"
-      SEMREL_PLUGIN_COMMENT_ON_PRS: "true"
+  - uses: "@semrel/provider-bitbucket"
+    phase: release
+    args:
+      workspace: "acme"
+      repo: "service-api"
+      app_password: "${BITBUCKET_APP_PASSWORD}"
+      username: "semrel-bot"
+      comment_on_prs: "true"
 ```
 
-## `SEMREL_PLUGIN_*` variables
+## Options
 
-| Name | Required | Description | Default |
-| --- | --- | --- | --- |
-| `SEMREL_PLUGIN_WORKSPACE` | Required | Bitbucket workspace name. | None |
-| `SEMREL_PLUGIN_REPO` | Optional | Bitbucket repository slug. Defaults from the git remote when available. | Derived from git remote |
-| `SEMREL_PLUGIN_APP_PASSWORD` | Required | Bitbucket app password. | None |
-| `SEMREL_PLUGIN_USERNAME` | Required | Bitbucket username. | None |
-| `SEMREL_PLUGIN_COMMENT_ON_PRS` | Optional | Comment on pull requests associated with commits in the release. Defaults to true; set to `false` to disable. The app password needs repository and pull request write permissions. | true |
+Every option can be set as an entry under `args` in `.semrel.yaml`. semrel passes each entry to the plugin as the environment variable shown in the table, so you can also set that variable directly (for example in your CI environment) instead of using `args`.
+
+| Argument | Environment variable | Required | Description | Default |
+| --- | --- | --- | --- | --- |
+| `workspace` | `SEMREL_PLUGIN_WORKSPACE` | Required | Bitbucket workspace name. | None |
+| `repo` | `SEMREL_PLUGIN_REPO` | Optional | Bitbucket repository slug. Defaults from the git remote when available. | Derived from git remote |
+| `app_password` | `SEMREL_PLUGIN_APP_PASSWORD` | Required | Bitbucket app password. | None |
+| `username` | `SEMREL_PLUGIN_USERNAME` | Required | Bitbucket username. | None |
+| `comment_on_prs` | `SEMREL_PLUGIN_COMMENT_ON_PRS` | Optional | Comment on pull requests associated with commits in the release. Defaults to true; set to `false` to disable. The app password needs repository and pull request write permissions. | true |
 
 ## `SEMREL_*` release context used
 
