@@ -401,7 +401,7 @@ func (c *Client) uploadMultipart(ctx context.Context, name string, content io.Re
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, reader)
 	if err != nil {
 		_ = reader.Close()
-		<-writeDone
+		_ = <-writeDone
 		return nil, fmt.Errorf("bitbucket: upload download request: %w", err)
 	}
 	req.Header.Set("Content-Type", mw.FormDataContentType())
@@ -410,7 +410,7 @@ func (c *Client) uploadMultipart(ctx context.Context, name string, content io.Re
 	resp, err := c.http.Do(req)
 	if err != nil {
 		_ = reader.Close()
-		<-writeDone
+		_ = <-writeDone
 		return nil, fmt.Errorf("bitbucket: upload download: %w", err)
 	}
 	defer func() {
