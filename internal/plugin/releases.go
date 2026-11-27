@@ -13,6 +13,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -36,6 +37,7 @@ type Client struct {
 	repoSlug         string
 	username         string
 	appPassword      string
+	assets           string
 	http             *http.Client
 	commentOnPRs     bool
 	commitHashes     []string
@@ -49,6 +51,7 @@ type Config struct {
 	RepoSlug         string
 	Username         string
 	AppPassword      string
+	Assets           string
 	Timeout          time.Duration
 	CommentOnPRs     bool
 	CommitHashes     []string
@@ -95,6 +98,7 @@ func ConfigFromEnv() Config {
 		RepoSlug:         repo,
 		Username:         username,
 		AppPassword:      appPassword,
+		Assets:           strings.TrimSpace(os.Getenv("SEMREL_PLUGIN_ASSETS")),
 		CommentOnPRs:     commentOnPRs,
 		commentConfigErr: commentConfigErr,
 	}
@@ -125,6 +129,7 @@ func NewClient(cfg Config) *Client {
 		repoSlug:         cfg.RepoSlug,
 		username:         cfg.Username,
 		appPassword:      cfg.AppPassword,
+		assets:           strings.TrimSpace(cfg.Assets),
 		http:             &http.Client{Timeout: t},
 		commentOnPRs:     cfg.CommentOnPRs,
 		commitHashes:     cfg.CommitHashes,
@@ -333,45 +338,103 @@ func (c *Client) UploadDownload(ctx context.Context, filePath string) (*Download
 	return c.uploadMultipart(ctx, filepath.Base(filePath), f)
 }
 
+// UploadConfiguredAssets uploads every file matched by SEMREL_PLUGIN_ASSETS to repository downloads.
+func (c *Client) UploadConfiguredAssets(ctx context.Context) error {
+	patterns := splitAssets(c.assets)
+	if strings.TrimSpace(c.assets) != "" && len(patterns) == 0 {
+		return fmt.Errorf("bitbucket: SEMREL_PLUGIN_ASSETS must contain at least one file path or glob pattern")
+	}
+	seen := make(map[string]struct{})
+	for _, pattern := range patterns {
+		matches, err := filepath.Glob(pattern)
+		if err != nil {
+			return fmt.Errorf("bitbucket: invalid asset pattern %q: %w", pattern, err)
+		}
+		if len(matches) == 0 {
+			return fmt.Errorf("bitbucket: asset pattern %q matched no files", pattern)
+		}
+		for _, match := range matches {
+			path := filepath.Clean(match)
+			if _, ok := seen[path]; ok {
+				continue
+			}
+			seen[path] = struct{}{}
+			info, err := os.Stat(path)
+			if err != nil {
+				return fmt.Errorf("bitbucket: stat asset %q: %w", path, err)
+			}
+			if !info.Mode().IsRegular() {
+				return fmt.Errorf("bitbucket: asset %q is not a regular file", path)
+			}
+			if _, err := c.UploadDownload(ctx, path); err != nil {
+				return fmt.Errorf("bitbucket: upload asset %q: %w", path, err)
+			}
+		}
+	}
+	return nil
+}
+
 func (c *Client) uploadDownloadContent(ctx context.Context, name string, content []byte) (*Download, error) {
 	return c.uploadMultipart(ctx, name, bytes.NewReader(content))
 }
 
 func (c *Client) uploadMultipart(ctx context.Context, name string, content io.Reader) (*Download, error) {
-	var buf bytes.Buffer
-	mw := multipart.NewWriter(&buf)
-	fw, err := mw.CreateFormFile("files", name)
-	if err != nil {
-		return nil, fmt.Errorf("bitbucket: create form file: %w", err)
-	}
-	if _, err := io.Copy(fw, content); err != nil {
-		return nil, fmt.Errorf("bitbucket: copy file: %w", err)
-	}
-	if err := mw.Close(); err != nil {
-		return nil, fmt.Errorf("bitbucket: close multipart writer: %w", err)
-	}
+	reader, writer := io.Pipe()
+	mw := multipart.NewWriter(writer)
+	writeDone := make(chan error, 1)
+	go func() {
+		fw, writeErr := mw.CreateFormFile("files", name)
+		if writeErr == nil {
+			_, writeErr = io.Copy(fw, content)
+		}
+		if closeErr := mw.Close(); writeErr == nil {
+			writeErr = closeErr
+		}
+		if writeErr != nil {
+			_ = writer.CloseWithError(writeErr)
+		} else {
+			_ = writer.Close()
+		}
+		writeDone <- writeErr
+	}()
 
 	url := fmt.Sprintf("%s/repositories/%s/%s/downloads", c.baseURL, c.workspace, c.repoSlug)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, &buf)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, reader)
 	if err != nil {
-		return nil, fmt.Errorf("bitbucket: upload download request: %w", err)
+		_ = reader.Close()
+		return nil, fmt.Errorf("bitbucket: upload download request: %w", errors.Join(err, <-writeDone))
 	}
 	req.Header.Set("Content-Type", mw.FormDataContentType())
 	c.setAuth(req)
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("bitbucket: upload download: %w", err)
+		_ = reader.Close()
+		return nil, fmt.Errorf("bitbucket: upload download: %w", errors.Join(err, <-writeDone))
 	}
 	defer func() {
 		_ = resp.Body.Close()
 	}()
+	if writeErr := <-writeDone; writeErr != nil {
+		return nil, fmt.Errorf("bitbucket: write upload body: %w", writeErr)
+	}
 
 	if resp.StatusCode >= 300 {
 		return nil, c.apiError("upload download", resp)
 	}
 
 	return &Download{Name: name}, nil
+}
+
+func splitAssets(raw string) []string {
+	parts := strings.Split(raw, ",")
+	patterns := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if pattern := strings.TrimSpace(part); pattern != "" {
+			patterns = append(patterns, pattern)
+		}
+	}
+	return patterns
 }
 
 // ListDownloads lists downloads for the repository.

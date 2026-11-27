@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -36,6 +37,7 @@ func TestConfigFromEnv(t *testing.T) {
 	t.Setenv("BITBUCKET_REPO_FULL_NAME", "workspace/repo")
 	t.Setenv("SEMREL_PLUGIN_USERNAME", "user")
 	t.Setenv("BITBUCKET_APP_PASSWORD", "pass")
+	t.Setenv("SEMREL_PLUGIN_ASSETS", "dist/*.tar.gz, SBOM.json")
 
 	cfg := bitbucket.ConfigFromEnv()
 
@@ -44,6 +46,9 @@ func TestConfigFromEnv(t *testing.T) {
 	}
 	if !cfg.CommentOnPRs {
 		t.Fatal("expected pull request comments to be enabled by default")
+	}
+	if cfg.Assets != "dist/*.tar.gz, SBOM.json" {
+		t.Fatalf("Assets = %q", cfg.Assets)
 	}
 }
 
@@ -225,6 +230,61 @@ func TestUploadDownload_OpenError(t *testing.T) {
 	c := bitbucket.NewClient(bitbucket.Config{Workspace: "org", RepoSlug: "repo"})
 	if _, err := c.UploadDownload(context.Background(), "missing-file.txt"); err == nil {
 		t.Fatal("UploadDownload() error = nil, want error")
+	}
+}
+
+func TestUploadConfiguredAssets(t *testing.T) {
+	assetPath := filepath.Join(t.TempDir(), "sbom.json")
+	if err := os.WriteFile(assetPath, []byte("sbom-data"), 0o600); err != nil {
+		t.Fatalf("write asset: %v", err)
+	}
+	uploaded := false
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repositories/myorg/myrepo/downloads", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Errorf("Method = %s, want POST", r.Method)
+		}
+		file, header, err := r.FormFile("files")
+		if err != nil {
+			t.Fatalf("FormFile(files): %v", err)
+		}
+		defer func() { _ = file.Close() }()
+		if header.Filename != "sbom.json" {
+			t.Errorf("filename = %q", header.Filename)
+		}
+		data, err := io.ReadAll(file)
+		if err != nil {
+			t.Fatalf("read asset: %v", err)
+		}
+		if string(data) != "sbom-data" {
+			t.Errorf("uploaded content = %q", data)
+		}
+		uploaded = true
+		w.WriteHeader(http.StatusCreated)
+	})
+	server := httptest.NewServer(mux)
+	defer server.Close()
+	c := bitbucket.NewClient(bitbucket.Config{
+		BaseURL: server.URL, Workspace: "myorg", RepoSlug: "myrepo",
+		Username: "user", AppPassword: "pass", Assets: assetPath,
+	})
+
+	if err := c.UploadConfiguredAssets(context.Background()); err != nil {
+		t.Fatalf("UploadConfiguredAssets() error = %v", err)
+	}
+	if !uploaded {
+		t.Fatal("expected asset upload")
+	}
+}
+
+func TestUploadConfiguredAssetsRejectsUnmatchedPattern(t *testing.T) {
+	c := bitbucket.NewClient(bitbucket.Config{
+		Workspace: "myorg", RepoSlug: "myrepo",
+		Assets: filepath.Join(t.TempDir(), "missing-*.tar.gz"),
+	})
+	if err := c.UploadConfiguredAssets(context.Background()); err == nil ||
+		!strings.Contains(err.Error(), "matched no files") {
+		t.Fatalf("UploadConfiguredAssets() error = %v, want unmatched asset error", err)
 	}
 }
 

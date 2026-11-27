@@ -42,6 +42,9 @@ func run() int {
 	}
 	if os.Getenv("SEMREL_DRY_RUN") == "true" {
 		fmt.Printf("provider-bitbucket: [dry-run] would create release %s\n", tagName)
+		if cfg.Assets != "" {
+			fmt.Printf("assets: %s\n", cfg.Assets)
+		}
 		return 0
 	}
 
@@ -50,6 +53,10 @@ func run() int {
 
 	client := plugin.New(cfg)
 	if _, err := client.CreateRelease(ctx, tagName, os.Getenv("SEMREL_CHANGELOG")); err != nil {
+		fmt.Fprintln(os.Stderr, "provider-bitbucket:", err)
+		return 1
+	}
+	if err := client.UploadConfiguredAssets(ctx); err != nil {
 		fmt.Fprintln(os.Stderr, "provider-bitbucket:", err)
 		return 1
 	}

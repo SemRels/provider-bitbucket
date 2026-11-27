@@ -46,6 +46,7 @@ plugins:
       repo: "service-api"
       app_password: "${BITBUCKET_APP_PASSWORD}"
       username: "semrel-bot"
+      assets: "dist/*.tar.gz,dist/*.zip,dist/*.sbom.json,dist/*.sig"
       comment_on_prs: "true"
 ```
 
@@ -59,6 +60,7 @@ Every option can be set as an entry under `args` in `.semrel.yaml`. semrel passe
 | `repo` | `SEMREL_PLUGIN_REPO` | Optional | Bitbucket repository slug. Defaults from the git remote when available. | Derived from git remote |
 | `app_password` | `SEMREL_PLUGIN_APP_PASSWORD` | Required | Bitbucket app password. | None |
 | `username` | `SEMREL_PLUGIN_USERNAME` | Required | Bitbucket username. | None |
+| `assets` | `SEMREL_PLUGIN_ASSETS` | Optional | Comma-separated file paths or glob patterns to upload to Bitbucket repository downloads. Every pattern must match; upload failures fail the plugin. These files are not release-specific attachments. | None |
 | `comment_on_prs` | `SEMREL_PLUGIN_COMMENT_ON_PRS` | Optional | Comment on pull requests associated with commits in the release. Defaults to true; set to `false` to disable. The app password needs repository and pull request write permissions. | true |
 
 ## `SEMREL_*` release context used
@@ -71,7 +73,7 @@ Every option can be set as an entry under `args` in `.semrel.yaml`. semrel passe
 
 ## Example behavior
 
-The plugin creates or updates a Bitbucket release for the current tag and publishes the changelog text as the release notes. By default it posts an idempotent link comment to associated pull requests. Set `SEMREL_PLUGIN_COMMENT_ON_PRS` to `false` to disable comments.
+The plugin uploads the generated changelog file and any files matched by `SEMREL_PLUGIN_ASSETS` to Bitbucket repository downloads. Bitbucket Cloud does not associate these downloads with an individual release entry. A missing match or failed upload returns an error. By default it posts an idempotent link comment to associated pull requests. Set `SEMREL_PLUGIN_COMMENT_ON_PRS` to `false` to disable comments.
 
 ## License
 
